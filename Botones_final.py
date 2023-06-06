@@ -72,6 +72,8 @@ def cambiar_semaforo(sentido, color):
     semaforos_color[sentido] = color
     semaforos_color[sentido_contrario] = color_contrario
 
+    actualizar_semaforos()
+
 def actualizar_semaforos():
     # Apagar todos los semáforos
     for direccion in semaforos_pin:
@@ -113,23 +115,53 @@ def avanzar_autos():
         if contador_autos[direccion] > 0:
             contador_autos[direccion] -= 1
             print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
-        contador_autos[direccion] = 0
-        print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
 
+cambio_semaforo = False
+
+def cambiar_semaforo_cantidad_autos():
+    semaforo_activo = semaforo_verde()
+    if semaforo_activo is None:
+        return
+    global cambio_semaforo
+    max_autos_activo = max(contador_autos[direccion] for direccion in sentidos[semaforo_activo])
+    semaforo_inactivo = 0 if semaforo_activo == 1 else 1
+    max_autos_inactivo = max(contador_autos[direccion] for direccion in sentidos[semaforo_inactivo])
+
+    diferencia_autos = max_autos_activo - max_autos_inactivo
+
+    if diferencia_autos >= 0:
+        return
+    elif max_autos_activo == 0:
+        cambio_semaforo = True
+    elif diferencia_autos >= -2:
+        cambio_semaforo = False
+    else:
+        cambio_semaforo = True
+
+def continuar_proceso():
+    avanzar_autos()
+    cambiar_semaforo_cantidad_autos()
+
+def proceso_cambiar_semaforo(sentido_verde):
+    cambiar_semaforo(sentido_verde, 'amarillo')
+    time.sleep(1)
+    cambiar_semaforo(sentido_verde, 'rojo')
+
+# Ciclo principal
 try:
     veces = 0
     while True:
         # Realizar otras tareas aquí si es necesario
         time.sleep(1)
-        veces += 1
+        continuar_proceso()
         sentido_verde = semaforo_verde()
-        if veces == 5 and sentido_verde is not None:
-            cambiar_semaforo(sentido_verde, 'amarillo')
-            actualizar_semaforos()
-            time.sleep(1)
-            cambiar_semaforo(sentido_verde, 'rojo')
-            actualizar_semaforos()
+        if cambio_semaforo:
+            proceso_cambiar_semaforo(sentido_verde)
             veces = 0
-
+            continue
+        veces += 1
+        if veces == 5 and sentido_verde is not None:
+            proceso_cambiar_semaforo(sentido_verde)
+            veces = 0
 except KeyboardInterrupt:
     GPIO.cleanup()
