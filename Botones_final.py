@@ -95,6 +95,19 @@ def contar_automoviles(direccion):
     contador_autos[direccion] += 1
     print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
 
+def contar_autos_norte():
+    contar_automoviles('norte')
+
+def contar_autos_sur():
+    contar_automoviles('sur')
+
+def contar_autos_este():
+    contar_automoviles('este')
+
+def contar_autos_oeste():
+    contar_automoviles('oeste')
+
+
 def semaforo_verde():
     for sentido in semaforos_color:
         color = semaforos_color[sentido]
@@ -103,8 +116,10 @@ def semaforo_verde():
     return None
 
 # Configurar las interrupciones para los botones
-for direccion in direcciones:
-    GPIO.add_event_detect(botones_pin[direccion], GPIO.FALLING, callback=contar_automoviles(direccion), bouncetime=3000)
+GPIO.add_event_detect(botones_pin['norte'], GPIO.FALLING, callback=contar_autos_norte, bouncetime=3000)
+GPIO.add_event_detect(botones_pin['sur'], GPIO.FALLING, callback=contar_autos_sur, bouncetime=3000)
+GPIO.add_event_detect(botones_pin['este'], GPIO.FALLING, callback=contar_autos_este, bouncetime=3000)
+GPIO.add_event_detect(botones_pin['oeste'], GPIO.FALLING, callback=contar_autos_oeste, bouncetime=3000)
 
 def avanzar_autos():
     sentido_verde = semaforo_verde()
