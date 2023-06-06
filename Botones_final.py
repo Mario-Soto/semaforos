@@ -1,96 +1,135 @@
 import RPi.GPIO as GPIO
 import time
 
+direcciones = ['norte', 'sur', 'este', 'oeste']
+sentidos = {
+    0: ['norte', 'sur'],
+    1: ['este', 'oeste']
+}
+
 # Definir los pines de los semáforos
-#Semaforo 1
-rojo_pin = 2
-amarillo_pin = 3
-verde_pin = 4
+semaforos_pin = {
+    'norte': {
+        'rojo': 2,
+        'amarillo': 3,
+        'verde': 4
+    },
+    'sur': {
+        'rojo': 17,
+        'amarillo': 27,
+        'verde': 22
+    },
+    'este': {
+        'rojo': 14,
+        'amarillo': 15,
+        'verde': 18
+    },
+    'oeste': {
+        'rojo': 23,
+        'amarillo': 24,
+        'verde': 25
+    }
+}
 
-#Semaforo 2
-rojo_pin = 14
-amarillo_pin = 15
-verde_pin = 18
-
-#Semaforo 3
-rojo_pin = 17
-amarillo_pin = 27
-verde_pin = 22
-
-#Semaforo 4
-rojo_pin = 23
-amarillo_pin = 24
-verde_pin = 25
+semaforos_color = {
+    0: 'rojo',
+    1: 'verde',
+}
 
 # Definir los pines de los botones
-boton_norte_pin = 12
-boton_sur_pin = 16
-boton_este_pin = 20
-boton_oeste_pin = 21
+botones_pin = {
+    'norte': 12,
+    'sur': 16,
+    'este': 20,
+    'oeste': 21
+}
 
 # Variable global para contar los automóviles
 # contador_automoviles = 0
-contador_autos_norte = 0
-contador_autos_sur = 0
-contador_autos_este = 0
-contador_autos_oeste = 0
+contador_autos = {
+    'norte': 0,
+    'sur': 0,
+    'este': 0,
+    'oeste': 0
+}
 
 # Configurar los pines de los semáforos y los botones
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(rojo_pin, GPIO.OUT)
-GPIO.setup(amarillo_pin, GPIO.OUT)
-GPIO.setup(verde_pin, GPIO.OUT)
-GPIO.setup(boton_norte_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(boton_sur_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(boton_este_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(boton_oeste_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+for direccion in direcciones:
+    for color in semaforos_pin[direccion]:
+        GPIO.setup(semaforos_pin[direccion][color], GPIO.OUT)
+    GPIO.setup(botones_pin[direccion], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Función para cambiar el color del semáforo
-def cambiar_semaforo(color):
-    GPIO.output(rojo_pin, GPIO.LOW)
-    GPIO.output(amarillo_pin, GPIO.LOW)
-    GPIO.output(verde_pin, GPIO.LOW)
+def cambiar_semaforo(sentido, color):
+    if color == 'amarillo':
+        semaforos_color[sentido] = color
+        return
+    
+    # Cambiar el color del semáforo
+    color_contrario = 'rojo' if color == 'verde' else 'verde'
+    sentido_contrario = 0 if sentido == 1 else 1
+    semaforos_color[sentido] = color
+    semaforos_color[sentido_contrario] = color_contrario
 
-    if color == 'rojo':
-        GPIO.output(rojo_pin, GPIO.HIGH)
-    elif color == 'amarillo':
-        GPIO.output(amarillo_pin, GPIO.HIGH)
-    elif color == 'verde':
-        GPIO.output(verde_pin, GPIO.HIGH)
+def actualizar_semaforos():
+    # Apagar todos los semáforos
+    for direccion in semaforos_pin:
+        for color in semaforos_pin[direccion]:
+            GPIO.output(semaforos_pin[direccion][color], GPIO.LOW)
+    
+    # Encender los semáforos según el color
+    for sentido in semaforos_color:
+        color = semaforos_color[sentido]
+        direcciones_seleccionadas = sentidos[sentido]
+
+        for direccion in direcciones_seleccionadas:
+            for color_seleccionado in semaforos_pin[direccion]:
+                if color_seleccionado == color:
+                    GPIO.output(semaforos_pin[direccion][color], GPIO.HIGH)
 
 # Función para contar los automóviles y cambiar el semáforo
-def contar_automoviles(pin):
-    global contador_automoviles
+def contar_automoviles(direccion):
+    contador_autos[direccion] += 1
+    print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
 
-    # Aumentar el contador de automóviles
-    contador_automoviles += 1
-
-    # Calcular el lado con más automóviles
-    lado = ''
-    if contador_automoviles % 2 == 0:
-        lado = 'este/oeste'
-    else:
-        lado = 'norte/sur'
-
-    # Cambiar el color del semáforo según el lado con más automóviles
-    if lado == 'este/oeste':
-        cambiar_semaforo('verde')
-    else:
-        cambiar_semaforo('rojo')
-
-    print("Contador de automóviles:", contador_automoviles)
-    print("Lado con más automóviles:", lado)
+def semaforo_verde():
+    for sentido in semaforos_color:
+        color = semaforos_color[sentido]
+        if color == 'verde':
+            return sentido
+    return None
 
 # Configurar las interrupciones para los botones
-GPIO.add_event_detect(boton_norte_pin, GPIO.FALLING, callback=contar_automoviles_norte, bouncetime=3000)
-GPIO.add_event_detect(boton_sur_pin, GPIO.FALLING, callback=contar_automoviles_sur, bouncetime=3000)
-GPIO.add_event_detect(boton_este_pin, GPIO.FALLING, callback=contar_automoviles_este, bouncetime=3000)
-GPIO.add_event_detect(boton_oeste_pin, GPIO.FALLING, callback=contar_automoviles_oeste, bouncetime=3000)
+for direccion in direcciones:
+    GPIO.add_event_detect(botones_pin[direccion], GPIO.FALLING, callback=contar_automoviles(direccion), bouncetime=3000)
+
+def avanzar_autos():
+    sentido_verde = semaforo_verde()
+    if sentido_verde is None:
+        return
+    
+    for direccion in sentidos[sentido_verde]:
+        if contador_autos[direccion] > 0:
+            contador_autos[direccion] -= 1
+            print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
+        contador_autos[direccion] = 0
+        print('Contador de autos en {}: {}'.format(direccion, contador_autos[direccion]))
 
 try:
+    veces = 0
     while True:
         # Realizar otras tareas aquí si es necesario
         time.sleep(1)
+        veces += 1
+        sentido_verde = semaforo_verde()
+        if veces == 5 and sentido_verde is not None:
+            cambiar_semaforo(sentido_verde, 'amarillo')
+            actualizar_semaforos()
+            time.sleep(1)
+            cambiar_semaforo(sentido_verde, 'rojo')
+            actualizar_semaforos()
+            veces = 0
 
 except KeyboardInterrupt:
     GPIO.cleanup()
